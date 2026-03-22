@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tau K18 — Charge Pattern Editor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root{
+  --bg:#0f0f13;--surface:#17171e;--surface2:#1e1e28;--border:#2a2a38;
+  --text:#e8e8f0;--muted:#6b6b80;
+  --pos:#ff5555;--pos-bg:#3d1212;--pos-bd:#5a1a1a;
+  --neg:#f5c518;--neg-bg:#2d2400;--neg-bd:#4a3a00;
+  --phos:#4da6ff;--phos-bg:#0d2540;--phos-bd:#1a3a5a;
+  --aro:#51cf66;--aro-bg:#0d2a14;--aro-bd:#1a4a22;
+  --neutral:#b0b0c8;--neutral-bg:#1e1e28;--neutral-bd:#2a2a38;
+  --accent:#7c6af7;--accent2:#4ecdc4;--green:#51cf66;--red:#ff5555;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;padding:20px;}
+header{display:flex;align-items:baseline;gap:16px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:14px;}
+header h1{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;color:var(--accent);}
+header span{font-size:12px;color:var(--muted);}
+.layout{display:grid;grid-template-columns:1fr 290px;gap:18px;align-items:start;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;}
+.ptitle{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.ptitle .tag{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent2);text-transform:none;letter-spacing:0;font-weight:600;white-space:nowrap;}
+/* sequence */
+#seq-container{display:flex;flex-wrap:wrap;gap:3px;padding:12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);min-height:72px;user-select:none;}
+.aa-card{display:inline-flex;align-items:center;justify-content:center;width:26px;height:27px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;cursor:grab;border:1px solid transparent;transition:transform .1s,opacity .1s;flex-shrink:0;}
+.aa-card:active{cursor:grabbing;}
+.aa-card.pos{background:var(--pos-bg);color:var(--pos);border-color:var(--pos-bd);}
+.aa-card.neg{background:var(--neg-bg);color:var(--neg);border-color:var(--neg-bd);}
+.aa-card.phos{background:var(--phos-bg);color:var(--phos);border-color:var(--phos-bd);}
+.aa-card.aro{background:var(--aro-bg);color:var(--aro);border-color:var(--aro-bd);}
+.aa-card.aro-phos {
+  background: var(--phos-bg);  /* 蓝底 */
+  color: var(--aro);           /* 绿字 */
+  border-color: var(--phos-bd);
+}
+.aa-card.neutral{background:var(--neutral-bg);color:var(--neutral);border-color:var(--neutral-bd);}
+.aa-card.dragging{opacity:.2;}
+.aa-card.ins-before{border-left:3px solid var(--accent)!important;margin-left:3px;}
+.aa-card.ins-after{border-right:3px solid var(--accent)!important;margin-right:3px;}
+/* legend */
+.legend{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);}
+.ldot{width:9px;height:9px;border-radius:2px;flex-shrink:0;}
+/* charge viz */
+.charge-viz{display:flex;height:20px;border-radius:6px;overflow:hidden;margin-top:10px;gap:1px;}
+.cv-seg{flex:1;}
+/* kappa */
+.kappa-wrap{text-align:center;padding:8px 0;}
+.kappa-val{font-family:'JetBrains Mono',monospace;font-size:44px;font-weight:700;line-height:1;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.kappa-sub{font-size:11px;color:var(--muted);margin-top:3px;font-family:'JetBrains Mono',monospace;}
+.bar-wrap{margin-top:12px;background:var(--bg);border-radius:100px;height:7px;overflow:hidden;border:1px solid var(--border);}
+.bar-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--accent2),var(--accent),var(--pos));transition:width .4s cubic-bezier(.34,1.56,.64,1);}
+.kappa-interp{font-size:10px;color:var(--muted);text-align:center;margin-top:7px;min-height:14px;}
+/* csat */
+.csat-wrap{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.csat-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;}
+.csat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;}
+.csat-val{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:600;color:var(--accent2);}
+.csat-note{font-size:9px;color:var(--muted);line-height:1.5;}
+/* stats */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.stat-item{background:var(--bg);border-radius:7px;padding:9px;border:1px solid var(--border);}
+.stat-item .v{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;}
+.stat-item .l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:2px;}
+/* buttons */
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;border-radius:7px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);transition:all .15s;width:100%;margin-bottom:0;}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+.btn-primary:hover{background:#9585ff;}
+.btn-export{background:linear-gradient(135deg,#1a3a1a,#0d2d0d);color:var(--green);border-color:#2a4a2a;}
+.btn-export:hover{border-color:var(--green);}
+.btn-ghost{background:var(--surface2);color:var(--muted);font-size:11px;padding:7px;}
+.btn-ghost:hover{color:var(--text);background:var(--border);}
+.btn-import{background:linear-gradient(135deg,#1a1a3a,#0d0d2d);color:var(--accent);border-color:#2a2a4a;font-size:11px;padding:7px;}
+.btn-import:hover{border-color:var(--accent);}
+.btn-clip{background:linear-gradient(135deg,#1a2a3a,#0d1a2d);color:#7ec8ff;border-color:#2a3a4a;font-size:11px;padding:7px;}
+.btn-clip:hover{border-color:#7ec8ff;}
+/* preset */
+.preset-list{display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto;}
+.preset-item{display:flex;align-items:center;gap:4px;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;transition:all .12s;}
+.preset-item:hover{border-color:var(--accent);}
+.preset-item.active-p{border-color:var(--accent);background:var(--surface2);}
+.preset-item .pname{flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.preset-item .pbadge{font-family:'JetBrains Mono',monospace;font-size:9px;padding:1px 4px;border-radius:3px;background:var(--surface2);color:var(--muted);flex-shrink:0;}
+.preset-item .pico{font-size:10px;color:var(--muted);cursor:pointer;padding:2px 4px;border-radius:3px;flex-shrink:0;line-height:1;}
+.preset-item .pico:hover{color:var(--accent2);}
+.preset-item .pdel:hover{color:var(--red)!important;}
+/* history */
+.hist-item{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:var(--bg);border-radius:5px;margin-bottom:4px;font-size:10px;border:1px solid var(--border);cursor:pointer;transition:border-color .1s;}
+.hist-item:hover{border-color:var(--accent);}
+.hk{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--accent2);font-size:9px;}
+.ht{color:var(--muted);}
+.empty{font-size:11px;color:var(--muted);text-align:center;padding:8px;}
+/* side */
+.side{display:flex;flex-direction:column;gap:14px;}
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity .2s;}
+.modal-bg.open{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;width:440px;max-width:93vw;}
+.modal h3{font-size:14px;font-weight:600;margin-bottom:14px;}
+.modal label{font-size:10px;color:var(--muted);display:block;margin-bottom:4px;margin-top:10px;text-transform:uppercase;letter-spacing:.8px;}
+.modal input,.modal textarea,.modal select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;}
+.modal input:focus,.modal textarea:focus{border-color:var(--accent);}
+.modal textarea{resize:vertical;min-height:72px;font-size:11px;line-height:1.6;}
+.modal-btns{display:flex;gap:8px;margin-top:14px;}
+.modal-btns .btn{flex:1;}
+.merr{font-size:11px;color:var(--red);margin-top:5px;min-height:14px;}
+/* word modal */
+.fname-row{display:flex;gap:6px;align-items:center;}
+.fname-row input{flex:1;}
+.fname-row .ext{font-size:11px;color:var(--muted);white-space:nowrap;}
+/* toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 14px;border-radius:8px;font-size:12px;font-family:'JetBrains Mono',monospace;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;z-index:9999;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.ok{border-color:var(--green);color:var(--green);}
+.toast.err{border-color:var(--red);color:var(--red);}
+/* hidden file input */
+#file-import{display:none;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Charge Editor</h1>
+  <span>drag to insert · κ · Csat</span>
+</header>
+
+<div class="layout">
+  <!-- ═══════ LEFT COLUMN ═══════ -->
+  <div style="display:flex;flex-direction:column;gap:14px;">
+
+    <!-- ① 現在の配列を編集（最上部） -->
+    <div class="panel">
+      <div class="ptitle">
+        <span>現在の配列を編集</span>
+        <span class="tag" id="cur-name">WT</span>
+      </div>
+      <!-- name + seq inline edit -->
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:10px;">
+        <div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">配列名</div>
+          <input id="inline-name" type="text" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 9px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;" placeholder="配列名">
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">配列（一文字コード）</div>
+          <input id="inline-seq" type="text" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 9px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;" placeholder="アミノ酸一文字コード">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;">
+        <button class="btn btn-primary" onclick="applyInlineEdit()">✔ 適用</button>
+        <button class="btn btn-ghost" onclick="saveAsNewPreset()">＋ プリセットに保存</button>
+        <button class="btn btn-ghost" onclick="resetToWT()">↩ WTリセット</button>
+      </div>
+      <div style="font-size:10px;color:var(--red);margin-top:5px;min-height:13px;" id="inline-err"></div>
+    </div>
+
+    <!-- ② カード表示 -->
+    <div class="panel">
+      <div class="ptitle">
+        <span>Sequence — ドラッグで挿入移動</span>
+      </div>
+      <div id="seq-container"></div>
+      <div class="legend">
+        <div class="legend-item"><div class="ldot" style="background:var(--pos)"></div>K,R 正電荷</div>
+        <div class="legend-item"><div class="ldot" style="background:var(--neg)"></div>D,E 負電荷</div>
+        <div class="legend-item"><div class="ldot" style="background:var(--phos)"></div>S,T,Y リン酸化</div>
+        <div class="legend-item"><div class="ldot" style="background:var(--aro)"></div>F,W,Y 芳香族</div>
+        <div class="legend-item"><div class="ldot" style="background:var(--neutral)"></div>その他</div>
+      </div>
+    </div>
+
+    <!-- ③ 電荷分布 -->
+    <div class="panel">
+      <div class="ptitle">電荷分布 (sliding window 10 aa)</div>
+      <div class="charge-viz" id="charge-viz"></div>
+    </div>
+
+    <!-- ④ 計算・書き出し -->
+    <div class="panel">
+      <div class="ptitle">計算・書き出し</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px;">
+        <button class="btn btn-primary" onclick="calcAndSave()">▶ κ / Csat 計算</button>
+        <button class="btn btn-export" onclick="openWordModal()">⬇ Word (.docx)</button>
+      </div>
+      <button class="btn btn-clip" onclick="copyRichText()" style="width:100%;">
+        コピー
+      </button>
+      <div style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.5;">↑ コピー後 Word で <kbd style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:10px;">Ctrl+V</kbd> — 色・ハイライト保持</div>
+    </div>
+  </div>
+
+  <!-- ═══════ RIGHT COLUMN ═══════ -->
+  <div class="side">
+
+    <!-- κ & Csat -->
+    <div class="panel">
+      <div class="ptitle">κ値 &amp; Csat</div>
+      <div class="kappa-wrap">
+        <div class="kappa-val" id="kappa-val">—</div>
+        <div class="kappa-sub">κ: 帯電残基の線形分布パターン<br>（0=均一混合, 1=完全分離）</div>
+      </div>
+      <div class="bar-wrap"><div class="bar-fill" id="kappa-bar" style="width:0%"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:3px;"><span>0 均一</span><span>1 分離</span></div>
+      <div class="kappa-interp" id="kappa-interp"></div>
+      <div class="csat-wrap">
+        <div class="csat-row">
+          <span class="csat-lbl">Csat (相対値)</span>
+          <span class="csat-val" id="csat-val">—</span>
+        </div>
+        <div class="csat-note">CSAT: WT=1.0基準の相対的LLPS傾向指標。<br>κ↑・FCR↑ → Csat↓ → LLPS促進と予測。<br></div>
+      </div>
+    </div>
+
+    <!-- 統計 -->
+    <div class="panel">
+      <div class="ptitle">配列統計</div>
+      <div class="stat-grid">
+        <div class="stat-item"><div class="v" id="st-fcr">—</div><div class="l">FCR</div></div>
+        <div class="stat-item"><div class="v" id="st-ncpr">—</div><div class="l">NCPR</div></div>
+        <div class="stat-item"><div class="v" id="st-pos">—</div><div class="l">K+R</div></div>
+        <div class="stat-item"><div class="v" id="st-neg">—</div><div class="l">D+E</div></div>
+      </div>
+    </div>
+
+    <!-- プリセット -->
+    <div class="panel">
+      <div class="ptitle">プリセット配列</div>
+      <!-- export / import buttons -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+        <button class="btn btn-ghost" onclick="exportPresets()">⬆ export</button>
+        <button class="btn btn-import" onclick="document.getElementById('file-import').click()">⬇ import</button>
+      </div>
+      <input type="file" id="file-import" accept=".json" onchange="importPresets(event)">
+      <div class="preset-list" id="preset-list"></div>
+    </div>
+
+    <!-- 履歴 -->
+    <div class="panel">
+      <div class="ptitle">計算履歴（クリックで復元）</div>
+      <div id="hist-list"><div class="empty">まだ計算なし</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Word Export Modal ═══ -->
+<div class="modal-bg" id="word-modal-bg" onclick="if(event.target===this)closeWordModal()">
+  <div class="modal">
+    <h3>Word ファイルを書き出す</h3>
+    <label>ファイル名</label>
+    <div class="fname-row">
+      <input type="text" id="word-filename" placeholder="例: TauK18_myVariant">
+      <span class="ext">.docx</span>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5;">
+      ※ ブラウザの「ダウンロード」設定で保存先フォルダを選べます。<br>
+      Chrome: 設定 → ダウンロード →「保存前に各ファイルの保存場所を確認する」をON にすると毎回フォルダ選択ダイアログが表示されます。
+    </div>
+    <div class="modal-btns" style="margin-top:14px;">
+      <button class="btn btn-export" onclick="doExportWord()">⬇ ダウンロード</button>
+      <button class="btn btn-ghost" onclick="closeWordModal()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Preset Add Modal ═══ -->
+<div class="modal-bg" id="preset-modal-bg" onclick="if(event.target===this)closePresetModal()">
+  <div class="modal">
+    <h3 id="preset-modal-title">プリセットに保存</h3>
+    <label>名前</label>
+    <input type="text" id="pm-name" placeholder="例: myVariant_κ0.4">
+    <label>配列（空白で現在の配列を使用）</label>
+    <textarea id="pm-seq" rows="4" placeholder="アミノ酸一文字コード (大文字)&#10;空欄の場合は現在表示中の配列を使用します"></textarea>
+    <div class="merr" id="pm-err"></div>
+    <div class="modal-btns">
+      <button class="btn btn-primary" onclick="confirmPresetModal()">保存</button>
+      <button class="btn btn-ghost" onclick="closePresetModal()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════
+// DEFAULTS
+// ══════════════════════════════════════════════
+const DEFAULTS = {
+  'WT':        'LQTAPVPMPDLKNVKSKIGSTENLKHQPGGGKVQIINKKLDLSNVQSKCGSKDNIKHVPGGGSVQIVYKPVDLSKVTSKCGSLGNIHHKPGGGQVEVKSEKLDFKDRVQSKIGSLDNITH',
+  'N+':        'KKKKKKKKKKKKKKKKKRKLQTAPVPMPDLNVSIGSTENLHQPGGGVQIINLDLSNVQSCGSDNIHVPGGGSVQIVYPVDLSVTSCGSLGNIHHPGGGQVEVSELDFDVQSIGSLDNITH',
+  'C−':        'LQTAPVPMPLKNVKSKIGSTNLKHQPGGGKVQIINKKLLSNVQSKCGSKNIKHVPGGGSVQIVYKPVLSKVTSKCGSLGNIHHKPGGGQVVKSKLFKRVQSKIGSLNITHDEDDDEEDDD',
+  'N+C−':      'KKKKKKKKKKKKKKKKKRKLQTAPVPMPLNVSIGSTNLHQPGGGVQIINLLSNVQSCGSNIHVPGGGSVQIVYPVLSVTSCGSLGNIHHPGGGQVVSLFVQSIGSLNITHDEDDDEEDDD',
+  'N-':        'DEDDDEEDDDLQTAPVPMPLKNVKSKIGSTNLKHQPGGGKVQIINKKLLSNVQSKCGSKNIKHVPGGGSVQIVYKPVLSKVTSKCGSLGNIHHKPGGGQVVKSKLFKRVQSKIGSLNITH',
+  'C+':        'LQTAPVPMPDLNVSIGSTENLHQPGGGVQIINLDLSNVQSCGSDNIHVPGGGSVQIVYPVDLSVTSCGSLGNIHHPGGGQVEVSELDFDVQSIGSLDNITHKKKKKKKKKKKKKKKKKRK',
+  'N-C+':      'DEDDDEEDDDLQTAPVPMPLNVSIGSTNLHQPGGGVQIINLLSNVQSCGSNIHVPGGGSVQIVYPVLSVTSCGSLGNIHHPGGGQVVSLFVQSIGSLNITHKKKKKKKKKKKKKKKKKRK',
+};
+
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+let presets = {};
+let seq = [];
+let curName = 'WT';
+let history = [];
+let wtRef = null;
+let dragSrc = null, dragDest = null;
+let presetModalMode = 'add', presetEditTarget = null;
+
+// ══════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════
+function save() {
+  try {
+    localStorage.setItem('tk_presets', JSON.stringify(presets));
+    localStorage.setItem('tk_history', JSON.stringify(history.slice(0,15)));
+    localStorage.setItem('tk_current', JSON.stringify({name:curName, seq}));
+    if (wtRef != null) localStorage.setItem('tk_wtref', String(wtRef));
+  } catch(e) {}
+}
+function load() {
+  try {
+    const p = localStorage.getItem('tk_presets'); if (p) presets = JSON.parse(p);
+    const h = localStorage.getItem('tk_history'); if (h) history = JSON.parse(h);
+    const c = localStorage.getItem('tk_current');
+    if (c) { const o = JSON.parse(c); seq = o.seq; curName = o.name; }
+    const r = localStorage.getItem('tk_wtref');  if (r) wtRef = parseFloat(r);
+  } catch(e) {}
+  Object.entries(DEFAULTS).forEach(([k,v]) => { if (!presets[k]) presets[k] = v; });
+  if (!seq.length) { seq = Array.from(DEFAULTS['WT']); curName = 'WT'; }
+}
+
+// ══════════════════════════════════════════════
+// CHARGE / TYPE
+// ══════════════════════════════════════════════
+const charge = aa => 'KR'.includes(aa) ? 1 : 'DE'.includes(aa) ? -1 : 0;
+function typeOf(aa) {
+  if ('KR'.includes(aa))  return 'pos';
+  if ('DE'.includes(aa))  return 'neg';
+  if ('ST'.includes(aa))  return 'phos';
+  if ('Y' === aa)         return 'aro-phos';  // ← 新增，Y单独处理
+  if ('FW'.includes(aa)) return 'aro';
+  return 'neutral';
+}
+
+// ══════════════════════════════════════════════
+// κ  (Das & Pappu 2013)
+// ══════════════════════════════════════════════
+function kappa(s) {
+  const n = s.length, ch = s.map(charge);
+  const np = ch.filter(c=>c===1).length, nm = ch.filter(c=>c===-1).length;
+  const fcr = (np+nm)/n;
+  if (!fcr) return 0;
+  const sg = (np/n - nm/n)**2 / fcr;
+  const bsig = g => Array.from({length:n-g+1}, (_,i) => {
+    const b=ch.slice(i,i+g), bp=b.filter(c=>c===1).length/g, bm=b.filter(c=>c===-1).length/g, bf=bp+bm;
+    return bf ? (bp-bm)**2/bf : 0;
+  });
+  const dlt = sigs => sigs.reduce((a,v)=>a+(v-sg)**2,0)/sigs.length;
+  const mxd = g => {
+    const mx=[...Array(np).fill(1),...Array(nm).fill(-1),...Array(n-np-nm).fill(0)];
+    return dlt(Array.from({length:n-g+1},(_,i)=>{
+      const b=mx.slice(i,i+g),bp=b.filter(c=>c===1).length/g,bm=b.filter(c=>c===-1).length/g,bf=bp+bm;
+      return bf?(bp-bm)**2/bf:0;
+    }));
+  };
+  const ks = [5,6].map(g => { const dm=mxd(g); return dm ? Math.min(1,dlt(bsig(g))/dm) : 0; });
+  return (ks[0]+ks[1])/2;
+}
+
+// ══════════════════════════════════════════════
+// Csat
+// ══════════════════════════════════════════════
+function csatRaw(s) {
+  const n=s.length, np=s.filter(a=>'KR'.includes(a)).length, nm=s.filter(a=>'DE'.includes(a)).length;
+  return Math.exp(-4.5*kappa(s) - 2.0*(np+nm)/n);
+}
+function csatRel(s) {
+  if (!wtRef) wtRef = csatRaw(Array.from(DEFAULTS['WT']));
+  return csatRaw(s)/wtRef;
+}
+
+// ══════════════════════════════════════════════
+// STATS
+// ══════════════════════════════════════════════
+function stats(s) {
+  const n=s.length, np=s.filter(a=>'KR'.includes(a)).length, nm=s.filter(a=>'DE'.includes(a)).length;
+  return {fcr:(np+nm)/n, ncpr:Math.abs(np-nm)/n, np, nm};
+}
+
+// ══════════════════════════════════════════════
+// RENDER SEQUENCE
+// ══════════════════════════════════════════════
+function renderSeq() {
+  const c = document.getElementById('seq-container');
+  c.innerHTML = '';
+  seq.forEach((aa, i) => {
+    const d = document.createElement('div');
+    d.className = `aa-card ${typeOf(aa)}`;
+    d.textContent = aa; d.draggable = true; d.dataset.i = i;
+    d.addEventListener('dragstart', e => { dragSrc=i; setTimeout(()=>d.classList.add('dragging'),0); e.dataTransfer.effectAllowed='move'; });
+    d.addEventListener('dragend',   () => { d.classList.remove('dragging'); clrIns(); });
+    d.addEventListener('dragover',  e => {
+      e.preventDefault(); clrIns();
+      const r=d.getBoundingClientRect();
+      if (e.clientX < r.left+r.width/2) { d.classList.add('ins-before'); dragDest=i; }
+      else                               { d.classList.add('ins-after');  dragDest=i+1; }
+    });
+    d.addEventListener('drop', e => { e.preventDefault(); clrIns(); doInsert(); });
+    c.appendChild(d);
+  });
+  c.addEventListener('dragover', e => e.preventDefault());
+  c.addEventListener('drop', e => { e.preventDefault(); clrIns(); if(dragDest===null)dragDest=seq.length; doInsert(); });
+  // sync inline fields
+  document.getElementById('inline-name').value = curName;
+  document.getElementById('inline-seq').value  = seq.join('');
+  document.getElementById('cur-name').textContent = curName;
+  liveUpdate();
+}
+function clrIns() { document.querySelectorAll('.aa-card').forEach(c=>c.classList.remove('ins-before','ins-after')); }
+function doInsert() {
+  if (dragSrc===null||dragDest===null) { dragSrc=dragDest=null; return; }
+  const s=dragSrc, d=dragDest;
+  if (s!==d && s!==d-1) {
+    const item = seq.splice(s,1)[0];
+    seq.splice(s<d?d-1:d, 0, item);
+    renderSeq(); save();
+  }
+  dragSrc=dragDest=null;
+}
+
+// ══════════════════════════════════════════════
+// LIVE UPDATE
+// ══════════════════════════════════════════════
+function liveUpdate() {
+  const st = stats(seq);
+  document.getElementById('st-fcr').textContent  = st.fcr.toFixed(3);
+  document.getElementById('st-ncpr').textContent = st.ncpr.toFixed(3);
+  document.getElementById('st-pos').textContent  = st.np;
+  document.getElementById('st-neg').textContent  = st.nm;
+  renderViz();
+}
+function renderViz() {
+  const v=document.getElementById('charge-viz'); v.innerHTML='';
+  const w=10, n=seq.length;
+  for (let i=0; i<=n-w; i++) {
+    const net = seq.slice(i,i+w).reduce((s,a)=>s+charge(a),0)/w;
+    const col = net>0 ? `rgba(255,85,85,${.15+Math.min(net*3,1)*.85})`
+              : net<0 ? `rgba(245,197,24,${.15+Math.min(-net*3,1)*.85})`
+              : 'rgba(100,100,130,.2)';
+    const sg=document.createElement('div'); sg.className='cv-seg'; sg.style.background=col; v.appendChild(sg);
+  }
+}
+
+// ══════════════════════════════════════════════
+// INLINE EDIT (top panel)
+// ══════════════════════════════════════════════
+function applyInlineEdit() {
+  const name = document.getElementById('inline-name').value.trim();
+  const raw  = document.getElementById('inline-seq').value.trim().toUpperCase().replace(/\s/g,'');
+  const err  = document.getElementById('inline-err');
+  if (!name) { err.textContent='名前を入力してください'; return; }
+  if (!/^[ACDEFGHIKLMNPQRSTVWY]+$/.test(raw)) { err.textContent='不正な文字が含まれています'; return; }
+  err.textContent='';
+  // rename key in presets if name changed
+  if (curName !== name && presets[curName] !== undefined) {
+    presets[name] = raw;
+    if (!(curName in DEFAULTS)) delete presets[curName];
+    else presets[curName] = DEFAULTS[curName]; // restore default
+  } else {
+    presets[name] = raw;
+  }
+  seq = Array.from(raw);
+  curName = name;
+  resetCalcDisplay();
+  renderSeq(); renderPresets(); save();
+  toast(`配列 "${name}" を適用しました`, 'ok');
+}
+
+function saveAsNewPreset() {
+  openPresetModal('add');
+}
+
+function resetCalcDisplay() {
+  document.getElementById('kappa-val').textContent = '—';
+  document.getElementById('kappa-bar').style.width = '0%';
+  document.getElementById('kappa-interp').textContent = '';
+  document.getElementById('csat-val').textContent = '—';
+}
+
+// ══════════════════════════════════════════════
+// CALC
+// ══════════════════════════════════════════════
+function calcAndSave() {
+  const k=kappa(seq), cs=csatRel(seq);
+  document.getElementById('kappa-val').textContent = k.toFixed(4);
+  document.getElementById('kappa-bar').style.width = (k*100)+'%';
+  document.getElementById('kappa-interp').textContent = interp(k);
+  document.getElementById('csat-val').textContent = cs.toFixed(3);
+  history.unshift({seq:[...seq], name:curName, k, cs, t:new Date().toLocaleTimeString('ja-JP')});
+  if (history.length>15) history.pop();
+  renderHistory(); renderPresets(); save();
+  toast(`κ=${k.toFixed(4)}  Csat=${cs.toFixed(3)}`, 'ok');
+}
+function interp(k) {
+  if (k<.10) return '→ well-mixed · 伸展コイル状';
+  if (k<.25) return '→ 弱い電荷偏り · random coil様';
+  if (k<.45) return '→ 中程度の電荷ブロック';
+  if (k<.65) return '→ 強い電荷分離 · hairpin傾向';
+  return '→ 高電荷ブロック · コンパクト構造';
+}
+
+// ══════════════════════════════════════════════
+// HISTORY
+// ══════════════════════════════════════════════
+function renderHistory() {
+  const el=document.getElementById('hist-list');
+  if (!history.length) { el.innerHTML='<div class="empty">まだ計算なし</div>'; return; }
+  el.innerHTML=history.map((h,i)=>`<div class="hist-item" onclick="restoreHist(${i})">
+    <span class="hk">${h.name} κ=${h.k.toFixed(3)} C=${h.cs.toFixed(2)}</span>
+    <span class="ht">${h.t}</span></div>`).join('');
+}
+function restoreHist(i) {
+  const h=history[i]; seq=[...h.seq]; curName=h.name;
+  document.getElementById('kappa-val').textContent=h.k.toFixed(4);
+  document.getElementById('kappa-bar').style.width=(h.k*100)+'%';
+  document.getElementById('kappa-interp').textContent=interp(h.k);
+  document.getElementById('csat-val').textContent=h.cs.toFixed(3);
+  renderSeq(); renderPresets(); save(); toast('履歴から復元','ok');
+}
+
+// ══════════════════════════════════════════════
+// PRESETS
+// ══════════════════════════════════════════════
+function renderPresets() {
+  const el=document.getElementById('preset-list');
+  const names=Object.keys(presets);
+  if (!names.length) { el.innerHTML='<div class="empty">プリセットなし</div>'; return; }
+  el.innerHTML=names.map(n=>{
+    const s=Array.from(presets[n]), k=kappa(s).toFixed(3), cs=csatRel(s).toFixed(2);
+    const isA=n===curName, isDef=n in DEFAULTS;
+    return `<div class="preset-item${isA?' active-p':''}" onclick="loadPreset('${esc(n)}')">
+      <span class="pname">${n}</span>
+      <span class="pbadge">κ=${k}</span>
+      <span class="pbadge">C=${cs}</span>
+      <span class="pico" onclick="event.stopPropagation();openPresetModal('edit','${esc(n)}')" title="編集">✎</span>
+      ${isDef?'':`<span class="pico pdel" onclick="event.stopPropagation();delPreset('${esc(n)}')" title="削除">✕</span>`}
+    </div>`;
+  }).join('');
+}
+const esc = s => s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+function loadPreset(n) {
+  if (!presets[n]) return;
+  seq=Array.from(presets[n]); curName=n;
+  resetCalcDisplay(); renderSeq(); renderPresets(); save();
+  toast(`"${n}" をロード`,'ok');
+}
+function delPreset(n) {
+  if (DEFAULTS[n]) { toast('デフォルトは削除不可','err'); return; }
+  if (!confirm(`"${n}" を削除しますか？`)) return;
+  delete presets[n];
+  if (curName===n) { const k=Object.keys(presets)[0]||'WT'; loadPreset(k); }
+  else { renderPresets(); save(); }
+  toast(`"${n}" を削除`,'ok');
+}
+function resetToWT() { Object.entries(DEFAULTS).forEach(([k,v])=>{presets[k]=v;}); loadPreset('WT'); }
+
+// ══════════════════════════════════════════════
+// PRESET MODAL (add / edit)
+// ══════════════════════════════════════════════
+function openPresetModal(mode='add', name=null) {
+  presetModalMode=mode; presetEditTarget=name;
+  document.getElementById('preset-modal-title').textContent = mode==='add'?'プリセットに保存':`"${name}" を編集`;
+  document.getElementById('pm-name').value = name||'';
+  document.getElementById('pm-seq').value  = name ? (presets[name]||'') : seq.join('');
+  document.getElementById('pm-err').textContent='';
+  document.getElementById('preset-modal-bg').classList.add('open');
+}
+function closePresetModal() { document.getElementById('preset-modal-bg').classList.remove('open'); }
+function confirmPresetModal() {
+  const name = document.getElementById('pm-name').value.trim();
+  const raw  = document.getElementById('pm-seq').value.trim().toUpperCase().replace(/\s/g,'')||seq.join('');
+  const err  = document.getElementById('pm-err');
+  if (!name) { err.textContent='名前を入力してください'; return; }
+  if (!/^[ACDEFGHIKLMNPQRSTVWY]+$/.test(raw)) { err.textContent='不正な文字が含まれています'; return; }
+  if (presetModalMode==='edit' && presetEditTarget && presetEditTarget!==name) {
+    delete presets[presetEditTarget];
+    if (curName===presetEditTarget) { curName=name; }
+  }
+  presets[name]=raw;
+  if (presetModalMode==='edit' && curName===(presetEditTarget||name)) {
+    seq=Array.from(raw); curName=name; renderSeq();
+  }
+  closePresetModal(); renderPresets(); save();
+  toast(`"${name}" を保存`,'ok');
+}
+
+// ══════════════════════════════════════════════
+// PRESET EXPORT / IMPORT (JSON)
+// ══════════════════════════════════════════════
+function exportPresets() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    presets: presets
+  };
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const ts   = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+  a.href=url; a.download=`TauK18_presets_${ts}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('プリセットをエクスポートしました','ok');
+}
+
+function importPresets(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      // support both {presets:{...}} and flat {name:seq} formats
+      const imported = data.presets || data;
+      let count=0;
+      Object.entries(imported).forEach(([k,v]) => {
+        if (typeof v==='string' && /^[ACDEFGHIKLMNPQRSTVWY]+$/.test(v)) {
+          presets[k]=v; count++;
+        }
+      });
+      renderPresets(); save();
+      toast(`${count} 件のプリセットをインポートしました`,'ok');
+    } catch(err) {
+      toast('インポートに失敗しました: '+err.message,'err');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value=''; // reset so same file can be re-imported
+}
+
+// ══════════════════════════════════════════════
+// WORD EXPORT MODAL
+// ══════════════════════════════════════════════
+function openWordModal() {
+  const k=kappa(seq);
+  document.getElementById('word-filename').value = `TauK18_${curName}_k${k.toFixed(3)}`.replace(/[^\w\-]/g,'_');
+  document.getElementById('word-modal-bg').classList.add('open');
+}
+function closeWordModal() { document.getElementById('word-modal-bg').classList.remove('open'); }
+
+// ── load JSZip from CDN ──
+function loadJSZip() {
+  return new Promise((res,rej) => {
+    if (window.JSZip) { res(window.JSZip); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload = () => res(window.JSZip);
+    s.onerror = () => rej(new Error('JSZip CDN load failed'));
+    document.head.appendChild(s);
+  });
+}
+
+// ── color/highlight mappings ──
+const AA_COLOR = aa =>
+  'KR'.includes(aa) ? 'EE0000' :
+  'DE'.includes(aa) ? 'FFD932' : '000000';
+
+const AA_HIGHLIGHT = aa =>
+  'STY'.includes(aa) ? 'cyan' : null;
+
+const AA_UNDERLINE = aa => aa === 'Y' || aa === 'F';
+
+// Word highlight name → OOXML color value
+const HL_COLOR = { red:'FF0000', yellow:'FFFF00', cyan:'00FFFF', green:'00FF00' };
+
+// ── build docx XML ──
+function buildDocxXml() {
+  const k=kappa(seq), cs=csatRel(seq), st=stats(seq);
+  const now = new Date().toLocaleString('ja-JP');
+
+  // helper: single run XML
+  function run(text, opts={}) {
+    const {bold=false, color='000000', font='Arial', sz=20, hl=null, mono=false, underline=false} = opts;
+    const rFontName = mono ? 'Courier New' : font;
+    let rPr = `<w:rFonts w:ascii="${rFontName}" w:hAnsi="${rFontName}"/>`;
+    rPr += `<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>`;
+    rPr += `<w:color w:val="${color}"/>`;
+    if (bold) rPr += '<w:b/><w:bCs/>';
+    if (hl)   rPr += `<w:highlight w:val="${hl}"/>`;
+    if (underline) rPr += '<w:u w:val="single"/>';
+    // escape XML
+    const escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<w:r><w:rPr>${rPr}</w:rPr><w:t xml:space="preserve">${escaped}</w:t></w:r>`;
+  }
+
+  function para(runs, opts={}) {
+    const {beforePt=0, afterPt=80} = opts;
+    const spacing = `<w:spacing w:before="${beforePt*20}" w:after="${afterPt*20}"/>`;
+    return `<w:p><w:pPr><w:jc w:val="left"/>${spacing}</w:pPr>${runs}</w:p>`;
+  }
+
+  function heading(text) {
+    return para(run(text, {bold:true, sz:26, color:'111111'}), {beforePt:8, afterPt:4});
+  }
+
+  // build sequence runs (one run per AA)
+  const seqRuns = seq.map(aa =>
+  run(aa, {color:AA_COLOR(aa), hl:AA_HIGHLIGHT(aa), underline:AA_UNDERLINE(aa), sz:20})
+).join('');
+
+  const body =
+    heading(`■ 配列 (${curName})`) +
+    para(seqRuns, {afterPt:8});
+
+  const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+<w:body>
+<w:sectPr>
+  <w:pgSz w:w="11906" w:h="16838"/>
+  <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+</w:sectPr>
+${body}
+</w:body>
+</w:document>`;
+  return docXml;
+}
+
+// ── assemble and download docx ──
+async function doExportWord() {
+  const fname = (document.getElementById('word-filename').value.trim()||'TauK18_export') + '.docx';
+  closeWordModal();
+  toast('Word 生成中...', 'ok');
+  try {
+    const JSZip = await loadJSZip();
+    const zip = new JSZip();
+
+    // [Content_Types].xml
+    zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml"  ContentType="application/xml"/>
+  <Override PartName="/word/document.xml"
+    ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`);
+
+    // _rels/.rels
+    zip.folder('_rels').file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+    Target="word/document.xml"/>
+</Relationships>`);
+
+    // word/document.xml
+    zip.folder('word').file('document.xml', buildDocxXml());
+
+    // word/_rels/document.xml.rels
+    zip.folder('word').folder('_rels').file('document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>`);
+
+    const blob = await zip.generateAsync({type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href=url; a.download=fname; a.click(); URL.revokeObjectURL(url);
+    toast(`"${fname}" ダウンロード完了`, 'ok');
+  } catch(e) {
+    console.error(e);
+    toast('エラー: ' + e.message, 'err');
+  }
+}
+
+// ══════════════════════════════════════════════
+// CLIPBOARD COPY (rich HTML → Word/GDocs paste)
+// ══════════════════════════════════════════════
+async function copyRichText() {
+  const k=kappa(seq), cs=csatRel(seq), st=stats(seq);
+  const now = new Date().toLocaleString('ja-JP');
+
+  function span(text, color, bg=null, underline=false) {
+  let style = `font-family:'MS Mincho',serif;font-size:11pt;color:${color};`;
+  if (bg)        style += `background:${bg};`;
+  if (underline) style += 'text-decoration:underline;';
+  return `<span style="${style}">${text}</span>`;
+}
+
+const seqHtml = seq.map(aa => {
+  if ('KR'.includes(aa)) return span(aa, '#EE0000');
+  if ('DE'.includes(aa)) return span(aa, '#FFD932');
+  if ('ST'.includes(aa)) return span(aa, '#000000', '#00FFFF');
+  if (aa === 'Y')        return span(aa, '#000000', '#00FFFF', true);
+  if (aa === 'F')        return span(aa, '#000000', null,      true);
+  return span(aa, '#000000');
+}).join('');
+
+  const html = `
+<html><body style="font-family:Arial,sans-serif;font-size:11pt;">
+<p><b>■ 配列 (${curName})</b></p>
+<p style="line-height:1.8;">${seqHtml}</p>
+</body></html>`;
+
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ 'text/html': new Blob([html], {type:'text/html'}) })
+    ]);
+    toast('クリップボードにコピーしました！Word / Google Docs に Ctrl+V で貼り付けてください', 'ok');
+  } catch(e) {
+    // fallback: plain text
+    try {
+      await navigator.clipboard.writeText(seq.join(''));
+      toast('書式コピー失敗 → プレーンテキストでコピーしました', 'err');
+    } catch(e2) {
+      toast('クリップボードへのアクセスが拒否されました', 'err');
+    }
+  }
+}
+
+// ══════════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════════
+function toast(msg, type='ok') {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className=`toast ${type} show`;
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+load();
+if (!wtRef) { wtRef=csatRaw(Array.from(DEFAULTS['WT'])); localStorage.setItem('tk_wtref',String(wtRef)); }
+renderSeq(); renderPresets(); renderHistory();
+</script>
+</body>
+</html>
